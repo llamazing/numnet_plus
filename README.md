@@ -48,6 +48,8 @@ If you use the code, please cite the following paper:
 `sh train.sh 345 5e-4 1e-4 5e-4 0.01`
 
 ### Eval
-Save your model as model.pt.
+- Save your model as model.pt.
+    
     `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json`
+    
     `python drop_eval.py --gold_path drop_dataset/drop_dataset_dev.json --prediction_path prediction.json`
