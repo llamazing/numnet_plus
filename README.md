@@ -30,9 +30,9 @@ If you use the code, please cite the following paper:
 
 - Download roberta model.
  
- `cd drop_dataset && mkdir roberta.large && cd roberta.large `
+  `cd drop_dataset && mkdir roberta.large && cd roberta.large `
   
- `wget -O pytorch_model.bin https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-pytorch_model.bin`
+  `wget -O pytorch_model.bin https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-pytorch_model.bin`
 
 - Download roberta config file.
   
