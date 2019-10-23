@@ -98,7 +98,7 @@ class DropBatchGen(object):
 
             out_batch = {"input_ids": input_ids, "input_mask": input_mask, "input_segments": input_segments,
                          "passage_mask": passage_mask, "question_mask": question_mask, "number_indices": number_indices,
-                         "number_graph": None, "passage_number_order": passage_number_order,
+                         "passage_number_order": passage_number_order,
                          "question_number_order": question_number_order,
                          "question_number_indices": question_number_indices,
                          "answer_as_passage_spans": None,
