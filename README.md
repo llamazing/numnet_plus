@@ -37,7 +37,7 @@ If you use the code, please cite the following paper:
 - Download roberta config file.
   
   `wget -O config.json https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-config.json`
-  - change `"output_hidden_states": false` to `"output_hidden_states": true`
+  - Modify `config.json` from `"output_hidden_states": false` to `"output_hidden_states": true`.
   
   
 - Download roberta vocab files.
