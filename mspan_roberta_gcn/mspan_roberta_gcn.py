@@ -124,8 +124,7 @@ class NumericallyAugmentedBertNet(nn.Module):
 
             self._gcn_input_proj = nn.Linear(node_dim * 2, node_dim)
             self._gcn = GCN_2(node_dim=node_dim, iteration_steps=gcn_steps)
-            self._iteration_steps = gcn_steps ###
-            print('gcn iteration_steps=%d' % self._iteration_steps, flush=True)
+            self._iteration_steps = gcn_steps
             self._proj_ln = nn.LayerNorm(node_dim)
             self._proj_ln0 = nn.LayerNorm(node_dim)
             self._proj_ln1 = nn.LayerNorm(node_dim)
@@ -141,9 +140,6 @@ class NumericallyAugmentedBertNet(nn.Module):
 
         # span num extraction
         self._proj_span_num = FFNLayer( 3 * hidden_size, hidden_size, 9, dropout_prob)
-        for name, p in self.named_parameters():
-            if p.requires_grad:
-                print(name, p.size(), flush=True)
 
     def forward(self,  # type: ignore
                 input_ids: torch.LongTensor,
@@ -182,7 +178,6 @@ class NumericallyAugmentedBertNet(nn.Module):
                 clamped_number_indices.unsqueeze(-1).expand(-1, -1, encoded_passage_for_numbers.size(-1)))
 
             # question number extraction
-            question_number_indices = question_number_indices
             question_number_mask = (question_number_indices > -1).long()
             clamped_question_number_indices = util.replace_masked_values(question_number_indices, question_number_mask, 0)
             question_encoded_number = torch.gather(encoded_question_for_numbers, 1,
