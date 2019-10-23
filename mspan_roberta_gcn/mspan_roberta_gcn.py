@@ -3,7 +3,7 @@ import torch.nn as nn
 from typing import List, Dict, Any
 from tools import allennlp as util
 import torch.nn.functional as F
-from mspan_roberta_gcn.util import FFNLayer, GCN_2, ResidualGRU
+from mspan_roberta_gcn.util import FFNLayer, GCN, ResidualGRU
 from tools.utils import DropEmAndF1
 
 
@@ -123,7 +123,7 @@ class NumericallyAugmentedBertNet(nn.Module):
             node_dim = modeling_out_dim
 
             self._gcn_input_proj = nn.Linear(node_dim * 2, node_dim)
-            self._gcn = GCN_2(node_dim=node_dim, iteration_steps=gcn_steps)
+            self._gcn = GCN(node_dim=node_dim, iteration_steps=gcn_steps)
             self._iteration_steps = gcn_steps
             self._proj_ln = nn.LayerNorm(node_dim)
             self._proj_ln0 = nn.LayerNorm(node_dim)
@@ -463,12 +463,6 @@ class NumericallyAugmentedBertNet(nn.Module):
                     answer_json["answer_type"] = "passage_span"
                     passage_str = metadata[i]['original_passage']
                     offsets = metadata[i]['passage_token_offsets']
-                    """
-                    predicted_span = tuple(best_passage_span[i].detach().cpu().numpy())
-                    start_offset = offsets[predicted_span[0] - passage_start][0]
-                    end_offset = offsets[predicted_span[1] - passage_start][1]
-                    predicted_answer = passage_str[start_offset:end_offset]
-                    """
                     predicted_answer, predicted_spans = best_answers_extraction(best_passage_span[i], best_span_number[i], passage_str, offsets, passage_start)
                     answer_json["value"] = predicted_answer
                     answer_json["spans"] = predicted_spans
@@ -476,12 +470,6 @@ class NumericallyAugmentedBertNet(nn.Module):
                     answer_json["answer_type"] = "question_span"
                     question_str = metadata[i]['original_question']
                     offsets = metadata[i]['question_token_offsets']
-                    """
-                    predicted_span = tuple(best_question_span[i].detach().cpu().numpy())
-                    start_offset = offsets[predicted_span[0] - question_start][0]
-                    end_offset = offsets[predicted_span[1] - question_start][1]
-                    predicted_answer = question_str[start_offset:end_offset]
-                    """
                     predicted_answer, predicted_spans = best_answers_extraction(best_question_span[i], best_span_number[i], question_str, offsets, question_start)
                     answer_json["value"] = predicted_answer
                     answer_json["spans"] = predicted_spans

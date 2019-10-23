@@ -240,9 +240,7 @@ class DropReader(object):
         question_text = " ".join(whitespace_tokenize(question_text))
 
         passage_tokens, passage_offset, numbers_in_passage, number_indices, number_len = roberta_tokenize(passage_text, self._tokenizer)
-            # passage_tokens = split_tokens_by_hyphen(passage_tokens)
         question_tokens, question_offset, numbers_in_question, question_number_indices, question_number_len = roberta_tokenize(question_text, self._tokenizer)
-        # question_tokens = split_tokens_by_hyphen(question_tokens)
         if self.passage_length_limit is not None:
             passage_tokens = passage_tokens[: self.passage_length_limit]
             if len(number_indices) > 0:
@@ -268,7 +266,6 @@ class DropReader(object):
 
         for answer_text in answer_texts:
             answer_tokens, _, _, _, _ = roberta_tokenize(answer_text, self._tokenizer, True)
-            # answer_tokens = split_tokens_by_hyphen(answer_tokens)
             tokenized_answer_texts.append(' '.join(token for token in answer_tokens))
 
         if self.instance_format == "drop":
@@ -351,7 +348,6 @@ class DropReader(object):
 
             if self.skip_when_all_empty and not any(
                 type_to_answer_map[skip_type] for skip_type in self.skip_when_all_empty):
-                # logger.info('my_skip_ans_type: %s' % answer_type)
                 return None
 
             answer_info = {"answer_texts": answer_texts,  # this `answer_texts` will not be used for evaluation
@@ -417,7 +413,6 @@ class DropReader(object):
         spans = []
         for answer_text in answer_texts:
             answer_tokens = [token.strip(USTRIPPED_CHARACTERS) for token in answer_text.split()]
-            # answer_tokens = answer_text.split()
             num_answer_tokens = len(answer_tokens)
             if answer_tokens[0] not in word_positions:
                 continue

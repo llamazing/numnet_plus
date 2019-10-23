@@ -42,10 +42,10 @@ class FFNLayer(nn.Module):
         return self.fc2(inter_act)
 
 
-class GCN_2(nn.Module):
+class GCN(nn.Module):
 
     def __init__(self, node_dim, extra_factor_dim=0, iteration_steps=1):
-        super(GCN_2, self).__init__()
+        super(GCN, self).__init__()
 
         self.node_dim = node_dim
         self.iteration_steps = iteration_steps
