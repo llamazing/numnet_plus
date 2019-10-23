@@ -37,6 +37,8 @@ If you use the code, please cite the following paper:
 - Download roberta config file.
   
   `wget -O config.json https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-config.json`
+  - change `"output_hidden_states": false` to `"output_hidden_states": true`
+  
   
 - Download roberta vocab files.
   
@@ -45,6 +47,7 @@ If you use the code, please cite the following paper:
   `wget -O merges.txt https://s3.amazonaws.com/models.huggingface.co/bert/roberta-large-merges.txt`  
   
 ### Train 
+
 `sh train.sh 345 5e-4 1e-4 5e-4 0.01`
 
 ### Eval
