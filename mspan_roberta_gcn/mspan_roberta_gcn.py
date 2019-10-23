@@ -148,7 +148,6 @@ class NumericallyAugmentedBertNet(nn.Module):
                 passage_mask: torch.LongTensor,
                 question_mask: torch.LongTensor,
                 number_indices: torch.LongTensor,
-                number_graph: torch.LongTensor,
                 passage_number_order: torch.LongTensor,
                 question_number_order: torch.LongTensor,
                 question_number_indices: torch.LongTensor,
