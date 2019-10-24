@@ -48,7 +48,7 @@ If you use the code, please cite the following paper:
   
 ### Train 
 
-`sh train.sh 345 5e-4 1e-4 5e-4 0.01`
+`sh train.sh 345 5e-4 1.5e-5 5e-5 0.01`
 
 ### Eval
 - Save your model as model.pt.
