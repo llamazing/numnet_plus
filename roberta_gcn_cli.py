@@ -6,6 +6,8 @@ from pprint import pprint
 from tools.model import DropBertModel
 from mspan_roberta_gcn.roberta_batch_gen import DropBatchGen
 from mspan_roberta_gcn.mspan_roberta_gcn import NumericallyAugmentedBertNet
+from tag_mspan_robert_gcn.roberta_batch_gen_tmspan import DropBatchGen as TDropBatchGen
+from tag_mspan_robert_gcn.tag_mspan_roberta_gcn import NumericallyAugmentedBertNet as TNumericallyAugmentedBertNet
 from datetime import datetime
 from tools.utils import create_logger, set_environment
 from pytorch_transformers import RobertaTokenizer, RobertaModel
@@ -38,8 +40,12 @@ set_environment(args.seed, args.cuda)
 def main():
     best_result = float("-inf")
     logger.info("Loading data...")
-    train_itr = DropBatchGen(args, data_mode="train", tokenizer=tokenizer)
-    dev_itr = DropBatchGen(args, data_mode="dev", tokenizer=tokenizer)
+    if not args.tag_mspan:
+        train_itr = DropBatchGen(args, data_mode="train", tokenizer=tokenizer)
+        dev_itr = DropBatchGen(args, data_mode="dev", tokenizer=tokenizer)
+    else:
+        train_itr = TDropBatchGen(args, data_mode="train", tokenizer=tokenizer)
+        dev_itr = TDropBatchGen(args, data_mode="dev", tokenizer=tokenizer)
     num_train_steps = int(args.max_epoch * len(train_itr) / args.gradient_accumulation_steps)
     logger.info("Num update steps {}!".format(num_train_steps))
 
@@ -47,11 +53,18 @@ def main():
     bert_model = RobertaModel.from_pretrained(args.roberta_model)
 
     logger.info("Build Drop model.")
-    network = NumericallyAugmentedBertNet(bert_model,
+    if not args.tag_mspan:
+        network = NumericallyAugmentedBertNet(bert_model,
                  hidden_size=bert_model.config.hidden_size,
                  dropout_prob=args.dropout,
                  use_gcn=args.use_gcn,
                  gcn_steps=args.gcn_steps)
+    else:
+        network = TNumericallyAugmentedBertNet(bert_model,
+                                              hidden_size=bert_model.config.hidden_size,
+                                              dropout_prob=args.dropout,
+                                              use_gcn=args.use_gcn,
+                                              gcn_steps=args.gcn_steps)
 
     logger.info("Build optimizer etc...")
     model = DropBertModel(args, network, num_train_step=num_train_steps)

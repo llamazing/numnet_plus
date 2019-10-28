@@ -36,6 +36,7 @@ def add_bert_args(parser: ArgumentParser):
 def add_model_args(parser: ArgumentParser):
     parser.add_argument("--use_gcn", action="store_true", help="Using graph infomation.")
     parser.add_argument("--gcn_steps", default=1, type=int, help="max gcn steps.")
+    parser.add_argument("--tag_mspan", action="store_true", help="tag based mspan prediction model.")
 
 def add_inference_args(parser: ArgumentParser):
     parser.add_argument("--pre_path", type=str, help="Prepath")
