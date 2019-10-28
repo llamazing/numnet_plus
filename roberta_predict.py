@@ -6,6 +6,9 @@ from tqdm import tqdm
 from mspan_roberta_gcn.inference_batch_gen import DropBatchGen
 from mspan_roberta_gcn.mspan_roberta_gcn import NumericallyAugmentedBertNet
 from mspan_roberta_gcn.drop_roberta_dataset import DropReader
+from tag_mspan_robert_gcn.drop_roberta_mspan_dataset import DropReader as TDropReader
+from tag_mspan_robert_gcn.inference_batch_gen import DropBatchGen as TDropBatchGen
+from tag_mspan_robert_gcn.tag_mspan_roberta_gcn import NumericallyAugmentedBertNet as TNumericallyAugmentedBertNet
 from pytorch_transformers import RobertaTokenizer, RobertaModel, RobertaConfig
 
 
@@ -22,7 +25,14 @@ args.cuda = torch.cuda.device_count() > 0
 print("Build bert model.")
 bert_model = RobertaModel(RobertaConfig().from_pretrained(args.roberta_model))
 print("Build Drop model.")
-network = NumericallyAugmentedBertNet(bert_model,
+if args.tag_mspan:
+    network = TNumericallyAugmentedBertNet(bert_model,
+                                          hidden_size=bert_model.config.hidden_size,
+                                          dropout_prob=0.0,
+                                          use_gcn=args.use_gcn,
+                                          gcn_steps=args.gcn_steps)
+else:
+    network = NumericallyAugmentedBertNet(bert_model,
                 hidden_size=bert_model.config.hidden_size,
                 dropout_prob=0.0,
                 use_gcn=args.use_gcn,
@@ -34,7 +44,12 @@ network.load_state_dict(torch.load(args.pre_path))
 
 print("Load data from {}.".format(args.inf_path))
 tokenizer = RobertaTokenizer.from_pretrained(args.roberta_model)
-inf_iter = DropBatchGen(args, tokenizer, DropReader(tokenizer, passage_length_limit=463, question_length_limit=46)._read(args.inf_path))
+if args.tag_mspan:
+    inf_iter = TDropBatchGen(args, tokenizer,
+                            TDropReader(tokenizer, passage_length_limit=463, question_length_limit=46)._read(
+                                args.inf_path))
+else:
+    inf_iter = DropBatchGen(args, tokenizer, DropReader(tokenizer, passage_length_limit=463, question_length_limit=46)._read(args.inf_path))
 
 print("Start inference...")
 result = {}

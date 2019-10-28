@@ -6,7 +6,7 @@ from tqdm import tqdm
 import numpy as np
 from word2number.w2n import word_to_num
 from typing import List, Dict, Any, Tuple
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 
 
 def get_number_from_word(word, improve_number_extraction=True):
@@ -71,6 +71,8 @@ def roberta_tokenize(text, tokenizer, is_answer=False):
     number_indices = []
     number_len = []
 
+
+    word_piece_mask = []
     # char_to_word_offset = []
     word_to_char_offset = []
     prev_is_whitespace = True
@@ -88,7 +90,7 @@ def roberta_tokenize(text, tokenizer, is_answer=False):
                 word_to_char_offset.append(i)
             else:
                 tokens[-1] += c
-            prev_is_whitespace = False
+            prev_is_whitespace = False  # char_to_word_offset.append(len(tokens) - 1)
 
     for i, token in enumerate(tokens):
         index = word_to_char_offset[i]
@@ -107,12 +109,16 @@ def roberta_tokenize(text, tokenizer, is_answer=False):
             split_tokens.append(sub_token)
             sub_token_offsets.append((index, index + len(token)))
 
+        word_piece_mask += [1]
+        if len(sub_tokens) > 1:
+            word_piece_mask += [0] * (len(sub_tokens) - 1)
+
     assert len(split_tokens) == len(sub_token_offsets)
-    return split_tokens, sub_token_offsets, numbers, number_indices, number_len
+    return split_tokens, sub_token_offsets, numbers, number_indices, number_len, word_piece_mask
 
 
 def clipped_passage_num(number_indices, number_len, numbers_in_passage, plen):
-    if number_indices[-1] < plen:
+    if len(number_indices) < 1 or number_indices[-1] < plen:
         return number_indices, number_len, numbers_in_passage
     lo = 0
     hi = len(number_indices) - 1
@@ -131,12 +137,13 @@ def cached_path(file_path):
     return file_path
 
 IGNORED_TOKENS = {'a', 'an', 'the'}
+MULTI_SPAN = 'multi_span'
 STRIPPED_CHARACTERS = string.punctuation + ''.join([u"‘", u"’", u"´", u"`", "_"])
 USTRIPPED_CHARACTERS = ''.join([u"Ġ"])
+START_CHAR = u"Ġ"
 
 def whitespace_tokenize(text):
     """Runs basic whitespace cleaning and splitting on a piece of text."""
-    # text = " ".join(basic_tokenizer.tokenize(text.strip())).strip()
     text = text.strip().lower()
     if not text:
         return []
@@ -155,51 +162,17 @@ class DropReader(object):
                  passage_length_limit: int = None, question_length_limit: int = None,
                  skip_when_all_empty: List[str] = None, instance_format: str = "drop",
                  relaxed_span_match_for_finding_labels: bool = True) -> None:
+        self.max_pieces = 512
         self._tokenizer = tokenizer
         self.passage_length_limit = passage_length_limit
         self.question_length_limit = question_length_limit
         self.skip_when_all_empty = skip_when_all_empty if skip_when_all_empty is not None else []
         for item in self.skip_when_all_empty:
             assert item in ["passage_span", "question_span", "addition_subtraction",
-                            "counting"], f"Unsupported skip type: {item}"
+                            "counting", "multi_span"], f"Unsupported skip type: {item}"
         self.instance_format = instance_format
         self.relaxed_span_match_for_finding_labels = relaxed_span_match_for_finding_labels
-
-    @staticmethod
-    def convert_word_to_number(word: str, try_to_include_more_numbers=False):
-        """
-        Currently we only support limited types of conversion.
-        """
-        if try_to_include_more_numbers:
-            # strip all punctuations from the sides of the word, except for the negative sign
-            punctruations = string.punctuation.replace('-', '')
-            word = word.strip(punctruations)
-            # some words may contain the comma as deliminator
-            word = word.replace(",", "")
-            # word2num will convert hundred, thousand ... to number, but we skip it.
-            if word in ["hundred", "thousand", "million", "billion", "trillion"]:
-                return None
-            try:
-                number = word_to_num(word)
-            except ValueError:
-                try:
-                    number = int(word)
-                except ValueError:
-                    try:
-                        number = float(word)
-                    except ValueError:
-                        number = None
-            return number
-        else:
-            no_comma_word = word.replace(",", "")
-            if no_comma_word in WORD_NUMBER_MAP:
-                number = WORD_NUMBER_MAP[no_comma_word]
-            else:
-                try:
-                    number = int(no_comma_word)
-                except ValueError:
-                    number = None
-            return number
+        self.flexibility_threshold = 1000
 
     def _read(self, file_path: str):
         # if `file_path` is a URL, redirect to the cache
@@ -233,24 +206,31 @@ class DropReader(object):
                          question_text: str, passage_text: str,
                          question_id: str, passage_id: str,
                          answer_annotations):
-        # pylint: disable=arguments-differ
-
         passage_text = " ".join(whitespace_tokenize(passage_text))
         question_text = " ".join(whitespace_tokenize(question_text))
 
-        passage_tokens, passage_offset, numbers_in_passage, number_indices, number_len = roberta_tokenize(passage_text, self._tokenizer)
-        question_tokens, question_offset, numbers_in_question, question_number_indices, question_number_len = roberta_tokenize(question_text, self._tokenizer)
-        if self.passage_length_limit is not None:
-            passage_tokens = passage_tokens[: self.passage_length_limit]
-            if len(number_indices) > 0:
-                number_indices, number_len, numbers_in_passage = \
-                    clipped_passage_num(number_indices, number_len, numbers_in_passage, len(passage_tokens))
+        passage_tokens, passage_offset, numbers_in_passage, number_indices, number_len, passage_wordpiece_mask =  \
+            roberta_tokenize(passage_text, self._tokenizer)
+        question_tokens, question_offset, numbers_in_question, question_number_indices, question_number_len, question_wordpiece_mask = \
+            roberta_tokenize(question_text, self._tokenizer)
+        question_tokens = question_tokens[:self.question_length_limit]
+        question_number_indices, question_number_len, numbers_in_question = clipped_passage_num(
+            question_number_indices, question_number_len, numbers_in_question, len(question_tokens)
+        )
 
-        if self.question_length_limit is not None:
-            question_tokens = question_tokens[: self.question_length_limit]
-            if len(question_number_indices) > 0:
-                question_number_indices, question_number_len, numbers_in_question = \
-                    clipped_passage_num(question_number_indices, question_number_len, numbers_in_question, len(question_tokens))
+        qp_tokens = ["<s>"] + question_tokens + ["</s>"] + passage_tokens
+        qp_wordpiece_mask = [1] + question_wordpiece_mask + [1] + passage_wordpiece_mask
+        q_len = len(question_tokens)
+        if len(qp_tokens) > self.max_pieces - 1:
+            qp_tokens = qp_tokens[:self.max_pieces - 1]
+            passage_tokens = passage_tokens[:self.max_pieces - q_len - 3]
+            passage_offset = passage_offset[:self.max_pieces - q_len - 3]
+            plen = len(passage_tokens)
+            number_indices, number_len, numbers_in_passage = clipped_passage_num(number_indices, number_len,
+                                                                                 numbers_in_passage, plen)
+            qp_wordpiece_mask = qp_wordpiece_mask[:self.max_pieces - 1]
+        qp_tokens += ["</s>"]
+        qp_wordpiece_mask += [1]
 
         answer_type: str = None
         answer_texts: List[str] = []
@@ -262,10 +242,16 @@ class DropReader(object):
 
         # Tokenize the answer text in order to find the matched span based on token
         tokenized_answer_texts = []
-
+        specific_answer_type = "single_span"
         for answer_text in answer_texts:
-            answer_tokens, _, _, _, _ = roberta_tokenize(answer_text, self._tokenizer, True)
-            tokenized_answer_texts.append(' '.join(token for token in answer_tokens))
+            answer_tokens, _, _, _, _, _ = roberta_tokenize(answer_text, self._tokenizer, True)
+            if answer_type in ["span", "spans"]:
+                answer_texts = list(OrderedDict.fromkeys(answer_texts))
+            if answer_type == "spans" and len(answer_texts) > 1:
+                specific_answer_type = MULTI_SPAN
+            tokenized_answer_text = " ".join(answer_tokens)
+            if tokenized_answer_text not in tokenized_answer_texts:
+                tokenized_answer_texts.append(tokenized_answer_text)
 
         if self.instance_format == "drop":
             def get_number_order(numbers):
@@ -342,24 +328,90 @@ class DropReader(object):
                 numbers_for_count = list(range(10))
                 valid_counts = self.find_valid_counts(numbers_for_count, target_numbers)
 
+            # add multi_span answer extraction
+            no_answer_bios = [0] * len(qp_tokens)
+            if specific_answer_type == MULTI_SPAN and (len(valid_passage_spans) > 0 or len(valid_question_spans) > 0):
+                spans_dict = {}
+                text_to_disjoint_bios = []
+                flexibility_count = 1
+                for tokenized_answer_text in tokenized_answer_texts:
+                    spans = self.find_valid_spans(qp_tokens, [tokenized_answer_text])
+                    if len(spans) == 0:
+                        # possible if the passage was clipped, but not for all of the answers
+                        continue
+                    spans_dict[tokenized_answer_text] = spans
+
+                    disjoint_bios = []
+                    for span_ind, span in enumerate(spans):
+                        bios = create_bio_labels([span], len(qp_tokens))
+                        disjoint_bios.append(bios)
+
+                    text_to_disjoint_bios.append(disjoint_bios)
+                    flexibility_count *= ((2 ** len(spans)) - 1)
+
+                answer_as_text_to_disjoint_bios = text_to_disjoint_bios
+
+                if (flexibility_count < self.flexibility_threshold):
+                    # generate all non-empty span combinations per each text
+                    spans_combinations_dict = {}
+                    for key, spans in spans_dict.items():
+                        spans_combinations_dict[key] = all_combinations = []
+                        for i in range(1, len(spans) + 1):
+                            all_combinations += list(itertools.combinations(spans, i))
+
+                    # calculate product between all the combinations per each text
+                    packed_gold_spans_list = itertools.product(*list(spans_combinations_dict.values()))
+                    bios_list = []
+                    for packed_gold_spans in packed_gold_spans_list:
+                        gold_spans = [s for sublist in packed_gold_spans for s in sublist]
+                        bios = create_bio_labels(gold_spans, len(qp_tokens))
+                        bios_list.append(bios)
+
+                    answer_as_list_of_bios = bios_list
+                    answer_as_text_to_disjoint_bios = [[no_answer_bios]]
+                else:
+                    answer_as_list_of_bios = [no_answer_bios]
+
+                # END
+
+                # Used for both "require-all" BIO loss and flexible loss
+                bio_labels = create_bio_labels(valid_question_spans + valid_passage_spans, len(qp_tokens))
+                span_bio_labels = bio_labels
+
+                is_bio_mask = 1
+
+                multi_span = [is_bio_mask, answer_as_text_to_disjoint_bios, answer_as_list_of_bios, span_bio_labels]
+            else:
+                multi_span = []
+
+
+            valid_passage_spans = valid_passage_spans if specific_answer_type != MULTI_SPAN or len(multi_span) < 1 else []
+            valid_question_spans = valid_question_spans if specific_answer_type != MULTI_SPAN or len(multi_span) < 1 else []
+
             type_to_answer_map = {"passage_span": valid_passage_spans, "question_span": valid_question_spans,
-                                  "addition_subtraction": valid_signs_for_add_sub_expressions, "counting": valid_counts}
+                                  "addition_subtraction": valid_signs_for_add_sub_expressions, "counting": valid_counts,
+                                  "multi_span": multi_span}
 
             if self.skip_when_all_empty and not any(
                 type_to_answer_map[skip_type] for skip_type in self.skip_when_all_empty):
+                # logger.info('my_skip_ans_type: %s' % answer_type)
                 return None
 
             answer_info = {"answer_texts": answer_texts,  # this `answer_texts` will not be used for evaluation
-                           "answer_passage_spans": valid_passage_spans, "answer_question_spans": valid_question_spans,
-                           "signs_for_add_sub_expressions": valid_signs_for_add_sub_expressions, "counts": valid_counts}
+                           "answer_passage_spans": valid_passage_spans,
+                           "answer_question_spans": valid_question_spans,
+                           "signs_for_add_sub_expressions": valid_signs_for_add_sub_expressions, "counts": valid_counts,
+                           "multi_span": multi_span}
 
             return self.make_marginal_drop_instance(question_tokens,
                                                     passage_tokens,
+                                                    qp_tokens,
                                                     numbers_as_tokens,
                                                     number_indices,
                                                     passage_number_order,
                                                     question_number_order,
                                                     question_number_indices,
+                                                    qp_wordpiece_mask,
                                                     answer_info,
                                                     additional_metadata={"original_passage": passage_text,
                                                                          "passage_token_offsets": passage_offset,
@@ -412,6 +464,7 @@ class DropReader(object):
         spans = []
         for answer_text in answer_texts:
             answer_tokens = [token.strip(USTRIPPED_CHARACTERS) for token in answer_text.split()]
+            # answer_tokens = answer_text.split()
             num_answer_tokens = len(answer_tokens)
             if answer_tokens[0] not in word_positions:
                 continue
@@ -463,21 +516,25 @@ class DropReader(object):
     @staticmethod
     def make_marginal_drop_instance(question_tokens: List[str],
                                     passage_tokens: List[str],
+                                    question_passage_tokens: List[str],
                                     number_tokens: List[str],
                                     number_indices: List[int],
                                     passage_number_order: np.ndarray,
                                     question_number_order: np.ndarray,
                                     question_number_indices: List[int],
+                                    wordpiece_mask: List[int],
                                     answer_info: Dict[str, Any] = None,
                                     additional_metadata: Dict[str, Any] = None):
         metadata = {
                     "question_tokens": [token for token in question_tokens],
                     "passage_tokens": [token for token in passage_tokens],
+                    "question_passage_tokens": question_passage_tokens,
                     "number_tokens": [token for token in number_tokens],
                     "number_indices": number_indices,
                     "question_number_indices": question_number_indices,
                     "passage_number_order": passage_number_order,
                     "question_number_order": question_number_order,
+                    "wordpiece_mask": wordpiece_mask
                     }
         if answer_info:
             metadata["answer_texts"] = answer_info["answer_texts"]
@@ -485,6 +542,23 @@ class DropReader(object):
             metadata["answer_question_spans"] = answer_info["answer_question_spans"]
             metadata["signs_for_add_sub_expressions"] = answer_info["signs_for_add_sub_expressions"]
             metadata["counts"] = answer_info["counts"]
+            metadata["multi_span"] = answer_info["multi_span"]
 
         metadata.update(additional_metadata)
         return metadata
+
+
+def create_bio_labels(spans: List[Tuple[int, int]], n_labels: int):
+
+    # initialize all labels to O
+    labels = [0] * n_labels
+
+    for span in spans:
+        start = span[0]
+        end = span[1]
+        # create B labels
+        labels[start] = 1
+        # create I labels
+        labels[start+1:end+1] = [2] * (end - start)
+
+    return labels
