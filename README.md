@@ -48,11 +48,24 @@ If you use the code, please cite the following paper:
   
 ### Train 
 
-`sh train.sh 345 5e-4 1.5e-5 5e-5 0.01`
+- train with simple multi-span extraction.
+
+    `sh train.sh 345 5e-4 1.5e-5 5e-5 0.01`
+    
+- train with tag based multi-span extraction(Tag based multi-span paper: http://arxiv.org/abs/1909.13375, github: https://github.com/eladsegal/tag-based-multi-span-extraction).
+    
+    `sh train.sh 345 5e-4 1.5e-5 5e-5 0.01 tag_mspan`
 
 ### Eval
 - Save your model as model.pt.
     
-    `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json`
+    - simple multi-span extraction.
+    
+        `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json`
+    
+    - tag based multi-span extraction.
+    
+        `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json tag_mspan` 
+    
     
     `python drop_eval.py --gold_path drop_dataset/drop_dataset_dev.json --prediction_path prediction.json`
