@@ -1,7 +1,7 @@
 # NumNet+
 
-This is the official code repository for NumNet+(https://leaderboard.allenai.org/drop/submission/bm60vq8f7g2p7t2ld0j0).
-NumNet(https://github.com/ranqiu92/NumNet) was used as a basis for our work.
+This is the official code repository for NumNet+ (https://leaderboard.allenai.org/drop/submission/bm60vq8f7g2p7t2ld0j0) and NumNet+ v2 (https://leaderboard.allenai.org/drop/submission/bmfuq9e0v32fq8pskug0).
+NumNet (https://github.com/ranqiu92/NumNet) was used as a basis for our work.
 
 <img src="numnet_plus_pic.png" alt="Framework" style="zoom:40%;" />
 
@@ -48,22 +48,22 @@ If you use the code, please cite the following paper:
   
 ### Train 
 
-- train with simple multi-span extraction.
+- Train with simple multi-span extraction (NumNet+).
 
     `sh train.sh 345 5e-4 1.5e-5 5e-5 0.01`
     
-- train with tag based multi-span extraction(Tag based multi-span paper: http://arxiv.org/abs/1909.13375, github: https://github.com/eladsegal/tag-based-multi-span-extraction).
+- Train with tag based multi-span extraction (NumNet+ v2, tag based multi-span paper: http://arxiv.org/abs/1909.13375, github: https://github.com/eladsegal/tag-based-multi-span-extraction).
     
     `sh train.sh 345 5e-4 1.5e-5 5e-5 0.01 tag_mspan`
 
 ### Eval
 - Save your model as model.pt.
     
-    - simple multi-span extraction.
+    - Simple multi-span extraction (NumNet+).
     
         `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json`
     
-    - tag based multi-span extraction.
+    - Tag based multi-span extraction (NumNet+ v2).
     
         `sh eval.sh drop_dataset/drop_dataset_dev.json prediction.json tag_mspan` 
     
